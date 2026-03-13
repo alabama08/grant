@@ -22,7 +22,7 @@
   .help-center-header {
     background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
     color: white;
-    margin-top: 4rem;
+    /* margin-top: 4rem; */
     padding: 40px 20px;
     text-align: center;
   }

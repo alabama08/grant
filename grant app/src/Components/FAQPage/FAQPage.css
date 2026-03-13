@@ -24,7 +24,7 @@
   .faq003-header {
     text-align: center;
     margin-bottom: 2rem;
-    margin-top: 4rem;
+    /* margin-top: 4rem; */
     padding: 1.5rem;
     background: linear-gradient(135deg, var(--faq003-primary-color), var(--faq003-secondary-color));
     color: var(--faq003-white);

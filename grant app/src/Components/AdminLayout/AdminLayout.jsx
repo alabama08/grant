@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { authService } from '../services/api';
+import { authService } from '../../services/api';
 import { 
   LogOut, 
   Users, 

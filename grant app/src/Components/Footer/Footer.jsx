@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   FaFacebook,
@@ -10,17 +10,11 @@ import {
   FaUserCog
 } from 'react-icons/fa';
 import './Footer.css';
+import { useRegister } from '../../Context/RegisterGrantContext';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  // Check if admin is authenticated when component mounts
-  useEffect(() => {
-    // Check for admin token in localStorage
-    const adminToken = localStorage.getItem('adminToken');
-    setIsAdmin(!!adminToken); // Convert to boolean (true if token exists, false otherwise)
-  }, []);
+  const { isAdmin } = useRegister();
 
   return (
     <footer className="platform-footer">
@@ -35,14 +29,13 @@ const Footer = () => {
             <li><Link to="/news">Latest News</Link></li>
             {isAdmin && (
               <li className="admin-link">
-                <Link to="/admin">
-                  <FaUserCog /> Admin Panel
+                <Link to="/admin-panel">
+                  <FaUserCog /> Admin Applications
                 </Link>
               </li>
             )}
           </ul>
         </div>
-
         <div className="footer-section">
           <h4>Support</h4>
           <ul>
@@ -51,9 +44,15 @@ const Footer = () => {
             <li><Link to="/help">Help Center</Link></li>
             <li><Link to="/privacy">Privacy Policy</Link></li>
             <li><Link to="/terms">Terms of Service</Link></li>
+            {isAdmin && (
+              <li className="admin-link">
+                <Link to="/admin-dashboard">
+                  <FaUserCog /> Admin Dashboard
+                </Link>
+              </li>
+            )}
           </ul>
         </div>
-
         <div className="footer-section">
           <h4>Connect With Us</h4>
           <div className="contact-info">
@@ -96,9 +95,7 @@ const Footer = () => {
           </div>
         </div>
       </div>
-
       <div className="footer-divider"></div>
-
       <div className="footer-bottom">
         <p>&copy; {currentYear} Grants Platform. All Rights Reserved.</p>
         <div className="footer-bottom-links">
@@ -106,7 +103,10 @@ const Footer = () => {
           <Link to="/terms">Terms</Link>
           <Link to="/sitemap">Sitemap</Link>
           {isAdmin && (
-            <Link to="/admin" className="admin-link">Admin</Link>
+            <>
+              <Link to="/admin-panel" className="admin-link">Admin Applications</Link>
+              <Link to="/admin-dashboard" className="admin-link">Admin Dashboard</Link>
+            </>
           )}
         </div>
       </div>

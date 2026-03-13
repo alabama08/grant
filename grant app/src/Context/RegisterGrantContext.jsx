@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 
 // Configure axios with fixed backend URL
@@ -11,7 +11,6 @@ const axiosInstance = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   },
-  // Don't use credentials by default as it can cause CORS issues
   withCredentials: false
 });
 
@@ -44,26 +43,13 @@ const validators = {
   }
 };
 
-// Action Types
-export const ACTION_TYPES = {
-  UPDATE_FORM: 'UPDATE_FORM',
-  SET_REGISTRATION_ERRORS: 'SET_REGISTRATION_ERRORS',
-  CLEAR_FORM: 'CLEAR_FORM',
-  SET_LOADING: 'SET_LOADING',
-  SET_ERROR: 'SET_ERROR',
-  SET_SUCCESS: 'SET_SUCCESS',
-  SET_LOGIN_FORM: 'SET_LOGIN_FORM',
-  SET_ADMIN_LOGIN_FORM: 'SET_ADMIN_LOGIN_FORM',
-  SET_LOGIN_ERRORS: 'SET_LOGIN_ERRORS',
-  SET_ADMIN_LOGIN_ERRORS: 'SET_ADMIN_LOGIN_ERRORS',
-  SET_AUTH_USER: 'SET_AUTH_USER',
-  SET_IS_AUTHENTICATED: 'SET_IS_AUTHENTICATED',
-  LOGOUT: 'LOGOUT',
-};
+// Create context
+export const RegisterContext = createContext();
 
-// Initial State
-const initialState = {
-  formData: {
+// Create a provider component
+export const RegisterProvider = ({ children }) => {
+  // State variables
+  const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
@@ -71,340 +57,260 @@ const initialState = {
     mobilePhone: '',
     password: '',
     confirmPassword: '',
-  },
-  loginForm: {
+  });
+  
+  const [loginForm, setLoginForm] = useState({
     email: '',
     password: '',
-  },
-  adminLoginForm: {
+  });
+  
+  const [adminLoginForm, setAdminLoginForm] = useState({
     email: '',
     password: '',
-  },
-  errors: {},
-  loginErrors: {},
-  adminLoginErrors: {},
-  loading: false,
-  error: null,
-  success: false,
-  user: null,
-  isAuthenticated: false,
-};
+  });
+  
+  const [errors, setErrors] = useState({});
+  const [loginErrors, setLoginErrors] = useState({});
+  const [adminLoginErrors, setAdminLoginErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-// Reducer
-function authReducer(state, action) {
-  switch (action.type) {
-    case ACTION_TYPES.UPDATE_FORM:
-      return {
-        ...state,
-        formData: {
-          ...state.formData,
-          ...action.payload,
-        },
-      };
-    case ACTION_TYPES.SET_LOGIN_FORM:
-      return {
-        ...state,
-        loginForm: {
-          ...state.loginForm,
-          ...action.payload,
-        },
-      };
-    case ACTION_TYPES.SET_ADMIN_LOGIN_FORM:
-      return {
-        ...state,
-        adminLoginForm: {
-          ...state.adminLoginForm,
-          ...action.payload,
-        },
-      };
-    case ACTION_TYPES.SET_REGISTRATION_ERRORS:
-      return {
-        ...state,
-        errors: action.payload,
-      };
-    case ACTION_TYPES.SET_LOGIN_ERRORS:
-      return {
-        ...state,
-        loginErrors: action.payload,
-      };
-    case ACTION_TYPES.SET_ADMIN_LOGIN_ERRORS:
-      return {
-        ...state,
-        adminLoginErrors: action.payload,
-      };
-    case ACTION_TYPES.CLEAR_FORM:
-      return {
-        ...state,
-        formData: initialState.formData,
-        errors: {},
-      };
-    case ACTION_TYPES.SET_LOADING:
-      return {
-        ...state,
-        loading: action.payload,
-      };
-    case ACTION_TYPES.SET_ERROR:
-      return {
-        ...state,
-        error: action.payload,
-        success: false,
-      };
-    case ACTION_TYPES.SET_SUCCESS:
-      return {
-        ...state,
-        success: action.payload,
-        error: null,
-      };
-    case ACTION_TYPES.SET_AUTH_USER:
-      return {
-        ...state,
-        user: action.payload,
-        isAuthenticated: !!action.payload,
-      };
-    case ACTION_TYPES.SET_IS_AUTHENTICATED:
-      return {
-        ...state,
-        isAuthenticated: action.payload,
-      };
-    case ACTION_TYPES.LOGOUT:
-      return {
-        ...state,
-        user: null,
-        isAuthenticated: false,
-      };
-    default:
-      return state;
-  }
-}
-
-// Create Context
-export const RegisterGrantContext = createContext();
-
-// Provider Component
-export const RegisterGrantProvider = ({ children }) => {
-  const [state, dispatch] = useReducer(authReducer, initialState);
-
-  // Check for existing authentication on mount
-  React.useEffect(() => {
-    const checkAuth = async () => {
+  // Helper function to get user data from localStorage
+  const getUserFromStorage = () => {
+    try {
       const token = localStorage.getItem('token');
       const userData = localStorage.getItem('userData');
       
       if (token && userData) {
-        try {
-          const user = JSON.parse(userData);
-          
-          // Set auth user directly from localStorage to avoid unnecessary API call
-          dispatch({ type: ACTION_TYPES.SET_AUTH_USER, payload: user });
-          
-          // Optional: Verify token validity with backend
-          try {
-            await axiosInstance.get('/api/auth/verify-token');
-          } catch (error) {
-            console.warn('Token verification failed, logging out');
-            localStorage.removeItem('token');
-            localStorage.removeItem('userData');
-            dispatch({ type: ACTION_TYPES.LOGOUT });
-          }
-        } catch (error) {
-          console.error('Error parsing user data from localStorage', error);
-          localStorage.removeItem('token');
-          localStorage.removeItem('userData');
+        return JSON.parse(userData);
+      }
+      return null;
+    } catch (error) {
+      console.error('Error parsing user data from localStorage', error);
+      return null;
+    }
+  };
+
+  // Check authentication status when component mounts
+  useEffect(() => {
+    const checkAuth = () => {
+      const storedUser = getUserFromStorage();
+      
+      if (storedUser) {
+        setUser(storedUser);
+        setIsAuthenticated(true);
+        setIsAdmin(storedUser.role === 'ADMIN' || (storedUser.roles && storedUser.roles.includes('ADMIN')));
+        
+        // Optionally verify token with backend
+        axiosInstance.get('/api/auth/verify-token')
+          .catch(error => {
+            console.warn('Token verification failed, but not logging out automatically');
+          });
+      } else {
+        if (isAuthenticated) {
+          logout();
         }
+      }
+      setLoading(false);
+    };
+    
+    // Check auth immediately when component mounts
+    checkAuth();
+    
+    // Listen for storage events (when localStorage changes in other tabs)
+    const handleStorageChange = (e) => {
+      if (e.key === 'token' || e.key === 'userData') {
+        checkAuth();
       }
     };
     
-    checkAuth();
-  }, []);
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Set up interval to periodically check authentication status
+    const authCheckInterval = setInterval(checkAuth, 60000); // Check every minute
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(authCheckInterval);
+    };
+  }, [isAuthenticated]);
 
-  const updateForm = useCallback((updates) => {
-    dispatch({ 
-      type: ACTION_TYPES.UPDATE_FORM, 
-      payload: updates 
-    });
-  }, []);
+  // Update form data
+  const updateForm = (updates) => {
+    setFormData(prev => ({ ...prev, ...updates }));
+  };
   
-  const updateLoginForm = useCallback((updates) => {
-    dispatch({
-      type: ACTION_TYPES.SET_LOGIN_FORM,
-      payload: updates
-    });
-  }, []);
+  // Update login form
+  const updateLoginForm = (updates) => {
+    setLoginForm(prev => ({ ...prev, ...updates }));
+  };
   
-  const updateAdminLoginForm = useCallback((updates) => {
-    dispatch({
-      type: ACTION_TYPES.SET_ADMIN_LOGIN_FORM,
-      payload: updates
-    });
-  }, []);
+  // Update admin login form
+  const updateAdminLoginForm = (updates) => {
+    setAdminLoginForm(prev => ({ ...prev, ...updates }));
+  };
 
-  const validateField = useCallback((name, value) => {
-    const errors = { ...state.errors };
+  // Validate registration field
+  const validateField = (name, value) => {
+    const newErrors = { ...errors };
     
     switch (name) {
       case 'firstName':
         if (!value.trim()) {
-          errors[name] = 'First name is required';
+          newErrors[name] = 'First name is required';
         } else if (value.trim().length < 2) {
-          errors[name] = 'First name must be at least 2 characters long';
+          newErrors[name] = 'First name must be at least 2 characters long';
         } else {
-          delete errors[name];
+          delete newErrors[name];
         }
         break;
         
       case 'lastName':
         if (!value.trim()) {
-          errors[name] = 'Last name is required';
+          newErrors[name] = 'Last name is required';
         } else if (value.trim().length < 2) {
-          errors[name] = 'Last name must be at least 2 characters long';
+          newErrors[name] = 'Last name must be at least 2 characters long';
         } else {
-          delete errors[name];
+          delete newErrors[name];
         }
         break;
         
       case 'email':
         if (!value) {
-          errors[name] = 'Email is required';
+          newErrors[name] = 'Email is required';
         } else if (!validators.isValidEmail(value)) {
-          errors[name] = 'Please enter a valid email address';
+          newErrors[name] = 'Please enter a valid email address';
         } else {
-          delete errors[name];
+          delete newErrors[name];
         }
         break;
         
       case 'primaryPhone':
         if (!value) {
-          errors[name] = 'Primary phone is required';
+          newErrors[name] = 'Primary phone is required';
         } else if (!validators.isValidPhone(value)) {
-          errors[name] = 'Please enter a valid phone number with country code (e.g., +234 for Nigeria)';
+          newErrors[name] = 'Please enter a valid phone number with country code (e.g., +234 for Nigeria)';
         } else {
-          delete errors[name];
+          delete newErrors[name];
         }
         break;
 
       case 'mobilePhone':
         if (value && !validators.isValidPhone(value)) {
-          errors[name] = 'Please enter a valid phone number with country code (e.g., +234 for Nigeria)';
+          newErrors[name] = 'Please enter a valid phone number with country code (e.g., +234 for Nigeria)';
         } else {
-          delete errors[name];
+          delete newErrors[name];
         }
         break;
         
       case 'password':
         if (!value) {
-          errors[name] = 'Password is required';
+          newErrors[name] = 'Password is required';
         } else if (value.length < 8) {
-          errors[name] = 'Password must be at least 8 characters long';
+          newErrors[name] = 'Password must be at least 8 characters long';
         } else if (!/[A-Z]/.test(value)) {
-          errors[name] = 'Password must contain at least one uppercase letter';
+          newErrors[name] = 'Password must contain at least one uppercase letter';
         } else if (!/[a-z]/.test(value)) {
-          errors[name] = 'Password must contain at least one lowercase letter';
+          newErrors[name] = 'Password must contain at least one lowercase letter';
         } else if (!/[0-9]/.test(value)) {
-          errors[name] = 'Password must contain at least one number';
+          newErrors[name] = 'Password must contain at least one number';
         } else {
-          delete errors[name];
+          delete newErrors[name];
           
           // Check password match when password changes
-          if (state.formData.confirmPassword && 
-              state.formData.confirmPassword !== value) {
-            errors['confirmPassword'] = 'Passwords must match exactly';
+          if (formData.confirmPassword && 
+              formData.confirmPassword !== value) {
+            newErrors['confirmPassword'] = 'Passwords must match exactly';
           }
         }
         break;
         
       case 'confirmPassword':
         if (!value) {
-          errors[name] = 'Please confirm your password';
-        } else if (value !== state.formData.password) {
-          errors[name] = 'Passwords must match exactly';
+          newErrors[name] = 'Please confirm your password';
+        } else if (value !== formData.password) {
+          newErrors[name] = 'Passwords must match exactly';
         } else {
-          delete errors[name];
+          delete newErrors[name];
         }
         break;
     }
 
-    dispatch({
-      type: ACTION_TYPES.SET_REGISTRATION_ERRORS,
-      payload: errors
-    });
-
-    return Object.keys(errors).length === 0;
-  }, [state.formData]);
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
   
   // Login form validation
-  const validateLoginField = useCallback((name, value) => {
-    const errors = { ...state.loginErrors };
+  const validateLoginField = (name, value) => {
+    const newErrors = { ...loginErrors };
     
     switch (name) {
       case 'email':
         if (!value) {
-          errors[name] = 'Email is required';
+          newErrors[name] = 'Email is required';
         } else if (!validators.isValidEmail(value)) {
-          errors[name] = 'Please enter a valid email address';
+          newErrors[name] = 'Please enter a valid email address';
         } else {
-          delete errors[name];
+          delete newErrors[name];
         }
         break;
         
       case 'password':
         if (!value) {
-          errors[name] = 'Password is required';
+          newErrors[name] = 'Password is required';
         } else if (value.length < 6) {
-          errors[name] = 'Password must be at least 6 characters long';
+          newErrors[name] = 'Password must be at least 6 characters long';
         } else {
-          delete errors[name];
+          delete newErrors[name];
         }
         break;
     }
     
-    dispatch({
-      type: ACTION_TYPES.SET_LOGIN_ERRORS,
-      payload: errors
-    });
-    
-    return Object.keys(errors).length === 0;
-  }, [state.loginErrors]);
+    setLoginErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
   
   // Admin login form validation
-  const validateAdminLoginField = useCallback((name, value) => {
-    const errors = { ...state.adminLoginErrors };
+  const validateAdminLoginField = (name, value) => {
+    const newErrors = { ...adminLoginErrors };
     
     switch (name) {
       case 'email':
         if (!value) {
-          errors[name] = 'Email is required';
+          newErrors[name] = 'Email is required';
         } else if (!validators.isValidEmail(value)) {
-          errors[name] = 'Please enter a valid email address';
+          newErrors[name] = 'Please enter a valid email address';
         } else {
-          delete errors[name];
+          delete newErrors[name];
         }
         break;
         
       case 'password':
         if (!value) {
-          errors[name] = 'Password is required';
+          newErrors[name] = 'Password is required';
         } else if (value.length < 6) {
-          errors[name] = 'Password must be at least 6 characters long';
+          newErrors[name] = 'Password must be at least 6 characters long';
         } else {
-          delete errors[name];
+          delete newErrors[name];
         }
         break;
     }
     
-    dispatch({
-      type: ACTION_TYPES.SET_ADMIN_LOGIN_ERRORS,
-      payload: errors
-    });
-    
-    return Object.keys(errors).length === 0;
-  }, [state.adminLoginErrors]);
+    setAdminLoginErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
-  const handleRegisterSubmit = useCallback(async (e) => {
+  // Handle registration submit
+  const handleRegisterSubmit = async (e) => {
     if (e) e.preventDefault();
       
     // Reset previous states
-    dispatch({ type: ACTION_TYPES.SET_ERROR, payload: null });
-    dispatch({ type: ACTION_TYPES.SET_SUCCESS, payload: false });
+    setError(null);
+    setSuccess(false);
       
     // Field validation
     const fieldsToValidate = [
@@ -413,70 +319,64 @@ export const RegisterGrantProvider = ({ children }) => {
     ];
       
     let isValid = true;
-    const currentErrors = {};
+    const currentErrors = { ...errors };
       
     // Validate each field
     fieldsToValidate.forEach(field => {
-      const fieldValue = state.formData[field];
+      const fieldValue = formData[field];
       if (!validateField(field, fieldValue)) {
         isValid = false;
       }
     });
   
     // Explicit password matching validation
-    if (state.formData.password !== state.formData.confirmPassword) {
+    if (formData.password !== formData.confirmPassword) {
       currentErrors.confirmPassword = 'Passwords must match exactly';
       isValid = false;
     }
   
     // Additional password complexity check
-    if (!validators.isValidPassword(state.formData.password)) {
+    if (!validators.isValidPassword(formData.password)) {
       currentErrors.password = 'Password does not meet complexity requirements';
       isValid = false;
     }
   
-    // If validation fails, dispatch errors and return
+    // If validation fails, update errors and return
     if (!isValid) {
-      dispatch({
-        type: ACTION_TYPES.SET_REGISTRATION_ERRORS,
-        payload: { ...state.errors, ...currentErrors }
-      });
+      setErrors(currentErrors);
       return false;
     }
   
     // Prepare submission data
     const submitData = {
-      firstName: state.formData.firstName.trim(),
-      lastName: state.formData.lastName.trim(),
-      email: state.formData.email.trim().toLowerCase(),
-      primaryPhone: validators.formatPhone(state.formData.primaryPhone),
-      mobilePhone: state.formData.mobilePhone 
-        ? validators.formatPhone(state.formData.mobilePhone) 
+      firstName: formData.firstName.trim(),
+      lastName: formData.lastName.trim(),
+      email: formData.email.trim().toLowerCase(),
+      primaryPhone: validators.formatPhone(formData.primaryPhone),
+      mobilePhone: formData.mobilePhone 
+        ? validators.formatPhone(formData.mobilePhone) 
         : '',
-      password: state.formData.password,
-      confirmPassword: state.formData.confirmPassword
+      password: formData.password,
+      confirmPassword: formData.confirmPassword
     };
   
     try {
-      dispatch({ type: ACTION_TYPES.SET_LOADING, payload: true });
+      setLoading(true);
       
       console.log('Submitting registration data to:', `${API_URL}/api/auth/register`);
       
       const response = await axiosInstance.post('/api/auth/register', submitData);
       
       // Handle successful registration
-      dispatch({ type: ACTION_TYPES.CLEAR_FORM });
-      dispatch({ type: ACTION_TYPES.SET_SUCCESS, payload: true });
+      clearRegistrationForm();
+      setSuccess(true);
       
       return response.data;
     } catch (error) {
       console.error('Registration Error:', error.response?.data || error.message);
       const errorMessage = error.response?.data?.message || 'Registration failed';
       
-      dispatch({ 
-        type: ACTION_TYPES.SET_ERROR, 
-        payload: errorMessage 
-      });
+      setError(errorMessage);
       
       // Handle specific field errors from server
       if (error.response?.data?.errors) {
@@ -486,38 +386,32 @@ export const RegisterGrantProvider = ({ children }) => {
             return acc;
           }, {});
       
-          dispatch({
-            type: ACTION_TYPES.SET_REGISTRATION_ERRORS,
-            payload: serverErrors
-          });
+          setErrors(serverErrors);
         } 
         else if (typeof error.response.data.errors === 'object') {
-          dispatch({
-            type: ACTION_TYPES.SET_REGISTRATION_ERRORS,
-            payload: error.response.data.errors
-          });
+          setErrors(error.response.data.errors);
         }
       }
       
       return false;
     } finally {
-      dispatch({ type: ACTION_TYPES.SET_LOADING, payload: false });
+      setLoading(false);
     }
-  }, [state.formData, validateField, state.errors]);
+  };
 
-  // User login function - simplified and made more robust
-  const login = useCallback(async (e) => {
+  // User login function
+  const login = async (e) => {
     if (e) e.preventDefault();
     
     // Reset previous error states
-    dispatch({ type: ACTION_TYPES.SET_ERROR, payload: null });
+    setError(null);
     
     // Validate login form fields
     let isValid = true;
     const loginFields = ['email', 'password'];
     
     loginFields.forEach(field => {
-      const fieldValue = state.loginForm[field];
+      const fieldValue = loginForm[field];
       if (!validateLoginField(field, fieldValue)) {
         isValid = false;
       }
@@ -528,17 +422,17 @@ export const RegisterGrantProvider = ({ children }) => {
     }
     
     try {
-      dispatch({ type: ACTION_TYPES.SET_LOADING, payload: true });
+      setLoading(true);
       
       // Prepare login data
       const loginData = {
-        email: state.loginForm.email.toLowerCase(),
-        password: state.loginForm.password
+        email: loginForm.email.toLowerCase(),
+        password: loginForm.password
       };
       
       console.log('Attempting login to:', `${API_URL}/api/auth/login`);
       
-      // Use a direct axios call with explicit configuration
+      // Use a direct axios call with explicit configuration for maximum reliability
       const response = await axios({
         method: 'post',
         url: `${API_URL}/api/auth/login`,
@@ -564,12 +458,17 @@ export const RegisterGrantProvider = ({ children }) => {
         firstName: userData.firstName,
         lastName: userData.lastName,
         email: userData.email,
-        role: userData.role
+        role: userData.role,
+        avatar: userData.avatar || userData.avatarUrl,
+        avatar: userData.avatarUrl || userData.avatar,
+        memberSince: userData.memberSince
       }));
       
       // Update state
-      dispatch({ type: ACTION_TYPES.SET_AUTH_USER, payload: userData });
-      dispatch({ type: ACTION_TYPES.SET_SUCCESS, payload: true });
+      setUser(userData);
+      setIsAuthenticated(true);
+      setIsAdmin(userData.role === 'ADMIN' || (userData.roles && userData.roles.includes('ADMIN')));
+      setSuccess(true);
       
       return true;
     } catch (error) {
@@ -578,30 +477,27 @@ export const RegisterGrantProvider = ({ children }) => {
       
       const errorMessage = error.response?.data?.message || 'Login failed. Please check your credentials.';
       
-      dispatch({ 
-        type: ACTION_TYPES.SET_ERROR, 
-        payload: errorMessage 
-      });
+      setError(errorMessage);
       
       return false;
     } finally {
-      dispatch({ type: ACTION_TYPES.SET_LOADING, payload: false });
+      setLoading(false);
     }
-  }, [state.loginForm, validateLoginField]);
+  };
   
   // Admin login function
-  const adminLogin = useCallback(async (e) => {
+  const adminLogin = async (e) => {
     if (e) e.preventDefault();
     
     // Reset previous states
-    dispatch({ type: ACTION_TYPES.SET_ERROR, payload: null });
+    setError(null);
     
     // Validate admin login form fields
     let isValid = true;
     const adminLoginFields = ['email', 'password'];
     
     adminLoginFields.forEach(field => {
-      const fieldValue = state.adminLoginForm[field];
+      const fieldValue = adminLoginForm[field];
       if (!validateAdminLoginField(field, fieldValue)) {
         isValid = false;
       }
@@ -612,7 +508,7 @@ export const RegisterGrantProvider = ({ children }) => {
     }
     
     try {
-      dispatch({ type: ACTION_TYPES.SET_LOADING, payload: true });
+      setLoading(true);
       
       // Use direct axios call for admin login
       const response = await axios({
@@ -623,8 +519,8 @@ export const RegisterGrantProvider = ({ children }) => {
           'Accept': 'application/json'
         },
         data: {
-          email: state.adminLoginForm.email.toLowerCase(),
-          password: state.adminLoginForm.password
+          email: adminLoginForm.email.toLowerCase(),
+          password: adminLoginForm.password
         }
       });
       
@@ -639,92 +535,150 @@ export const RegisterGrantProvider = ({ children }) => {
         throw new Error('Access denied. Admin privileges required.');
       }
       
-      // Store admin data in localStorage
+      // Store admin data using the same keys as regular login
       localStorage.setItem('token', userData.token);
       localStorage.setItem('userData', JSON.stringify({
         id: userData._id,
         firstName: userData.firstName,
         lastName: userData.lastName,
         email: userData.email,
-        role: userData.role
+        role: userData.role,
+        avatar: userData.avatar || userData.avatarUrl,
+        memberSince: userData.memberSince
       }));
       
       // Update state
-      dispatch({ type: ACTION_TYPES.SET_AUTH_USER, payload: userData });
-      dispatch({ type: ACTION_TYPES.SET_SUCCESS, payload: true });
+      setUser(userData);
+      setIsAuthenticated(true);
+      setIsAdmin(true);
+      setSuccess(true);
       
       return true;
     } catch (error) {
       console.error('Admin Login Error:', error.response?.data || error.message);
       const errorMessage = error.response?.data?.message || 'Admin login failed. Please verify your credentials.';
       
-      dispatch({ 
-        type: ACTION_TYPES.SET_ERROR, 
-        payload: errorMessage 
-      });
+      setError(errorMessage);
       
       return false;
     } finally {
-      dispatch({ type: ACTION_TYPES.SET_LOADING, payload: false });
+      setLoading(false);
     }
-  }, [state.adminLoginForm, validateAdminLoginField]);
+  };
+  
+  // Check admin status
+  const checkAdminStatus = () => {
+    console.log('Checking admin status in RegisterContext...');
+    try {
+      const storedUser = getUserFromStorage();
+      
+      // Check for admin role with flexible matching
+      const adminRole = storedUser && (
+        storedUser.role === 'ADMIN' || 
+        storedUser.role === 'admin' || 
+        (storedUser.roles && storedUser.roles.includes('ADMIN'))
+      );
+      
+      // Update context state
+      if (storedUser) {
+        setUser(storedUser);
+        setIsAuthenticated(true);
+        setIsAdmin(!!adminRole);
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+        setIsAdmin(false);
+      }
+      
+      console.log('Auth check result:', { 
+        parsedUser: storedUser, 
+        isAdmin: !!adminRole, 
+        isAuthenticated: !!storedUser 
+      });
+      
+      return !!adminRole;
+    } catch (e) {
+      console.error('Error checking authentication status:', e);
+      setIsAdmin(false);
+      setIsAuthenticated(false);
+      setUser(null);
+      return false;
+    }
+  };
   
   // Logout function
-  const logout = useCallback(() => {
+  const logout = () => {
     // Clear localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('userData');
+    localStorage.removeItem('user');
+    sessionStorage.removeItem('user');
     
     // Update state
-    dispatch({ type: ACTION_TYPES.LOGOUT });
+    setUser(null);
+    setIsAuthenticated(false);
+    setIsAdmin(false);
     
     return true;
-  }, []);
+  };
 
-  const clearRegistrationForm = useCallback(() => {
-    dispatch({ type: ACTION_TYPES.CLEAR_FORM });
-  }, []);
-  
-  const setError = useCallback((errorMessage) => {
-    dispatch({ type: ACTION_TYPES.SET_ERROR, payload: errorMessage });
-  }, []);
+  // Clear registration form
+  const clearRegistrationForm = () => {
+    setFormData({
+      firstName: '',
+      lastName: '',
+      email: '',
+      primaryPhone: '',
+      mobilePhone: '',
+      password: '',
+      confirmPassword: '',
+    });
+    setErrors({});
+  };
+
+  // Value to be provided by the context
+  const contextValue = {
+    formData,
+    loginForm,
+    adminLoginForm,
+    errors,
+    loginErrors,
+    adminLoginErrors,
+    loading,
+    error,
+    success,
+    user,
+    isAuthenticated,
+    isAdmin,
+    updateForm,
+    updateLoginForm,
+    updateAdminLoginForm,
+    validateField,
+    validateLoginField,
+    validateAdminLoginField,
+    handleRegisterSubmit,
+    login,
+    adminLogin,
+    logout,
+    clearRegistrationForm,
+    setError,
+    checkAdminStatus
+  };
 
   return (
-    <RegisterGrantContext.Provider 
-      value={{
-        state,
-        dispatch,
-        updateForm,
-        updateLoginForm,
-        updateAdminLoginForm,
-        validateField,
-        validateLoginField,
-        validateAdminLoginField,
-        handleRegisterSubmit,
-        login,
-        adminLogin,
-        logout,
-        clearRegistrationForm,
-        setError,
-        isAuthenticated: state.isAuthenticated,
-        user: state.user,
-        loading: state.loading,
-        error: state.error,
-        success: state.success
-      }}
-    >
+    <RegisterContext.Provider value={contextValue}>
       {children}
-    </RegisterGrantContext.Provider>
+    </RegisterContext.Provider>
   );
 };
 
-// Custom Hook
-export const useRegisterGrant = () => {
-  const context = useContext(RegisterGrantContext);
-  if (context === undefined) {
-    throw new Error('useRegisterGrant must be used within a RegisterGrantProvider');
+// Custom hook for using the register context
+export const useRegister = () => {
+  const context = useContext(RegisterContext);
+  if (!context) {
+    throw new Error('useRegister must be used within a RegisterProvider');
   }
   return context;
 };
 
-export default RegisterGrantContext;
+export default RegisterContext;

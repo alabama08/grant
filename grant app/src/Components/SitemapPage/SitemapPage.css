@@ -24,9 +24,9 @@
 
 .sit01-sitemap-page {
     max-width: 1400px;
-    margin: 2rem auto;
+    margin: 0 auto;
     background-color: white;
-    margin-top: 3rem;
+    /* margin-top: 3rem; */
     border-radius: 16px;
     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08), 0 5px 15px rgba(0, 0, 0, 0.05);
     overflow: hidden;

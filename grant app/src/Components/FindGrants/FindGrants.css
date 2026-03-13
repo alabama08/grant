@@ -20,7 +20,7 @@
   .find022-hero-section {
     text-align: center;
     margin-bottom: 30px;
-    margin-top: 3rem;
+    /* margin-top: 3rem; */
     padding: 40px 20px;
     background: linear-gradient(135deg, var(--find022-primary-color), var(--find022-secondary-color));
     color: white;

@@ -3,7 +3,7 @@ import React from 'react';
 // Context Providers
 import GrantsProvider from './Context/GrantsContext';
 import { UsGrantProvider } from './Context/UsGrantContext';
-import { RegisterGrantProvider } from './Context/RegisterGrantContext';
+import { RegisterProvider } from './Context/RegisterGrantContext';
 import NotificationProvider from './Context/NotificationContext';
 import { ApplicationFormProvider } from './Context/ApplicationFormContext';
 
@@ -16,12 +16,12 @@ function App() {
     <GrantsProvider>
       <NotificationProvider>
         <UsGrantProvider>
-          <RegisterGrantProvider>
+          <RegisterProvider>
             <ApplicationFormProvider>
               <AppRoutes />
               <ToastContainer />
             </ApplicationFormProvider>
-          </RegisterGrantProvider>
+          </RegisterProvider>
         </UsGrantProvider>
       </NotificationProvider>
     </GrantsProvider>

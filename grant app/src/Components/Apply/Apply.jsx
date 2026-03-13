@@ -1,14 +1,20 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import PhoneInput from 'react-phone-number-input'
+import PhoneInput from 'react-phone-number-input';
 import { MdCloudUpload, MdDelete } from 'react-icons/md';
 import { CreditCard, Eye, EyeOff, Key, Lock } from 'lucide-react';
-import { useApplicationForm } from '../../Context/ApplicationFormContext';
-import './Apply.css'
+import { useApplicationForm, FUNDING_TYPES } from '../../Context/ApplicationFormContext';
+import './Apply.css';
 
 // States array
 const states = [
-  'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland','Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina','South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming'
+  'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 
+  'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 
+  'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 
+  'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 
+  'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 
+  'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 
+  'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming'
 ];
 
 // Security questions
@@ -18,41 +24,32 @@ const securityQuestions = [
   'In what city were you born?'
 ];
 
-
-
 const Apply = () => {
   // Use the custom hook from your ApplicationFormContext
   const {
     formData,
     currentStep,
-    updateFormField,
-    moveToNextStep = () => {},
-    moveToPreviousStep = () => {},
-    submitForm,
     errors,
     isSubmitting,
+    updateFormField,
+    moveToNextStep,
+    moveToPreviousStep,
+    submitForm,
     validateCurrentStep,
+    removeFile
   } = useApplicationForm();
 
-  // Local state for password visibility
+  // Local state
   const [showSSN, setShowSSN] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showFacebookPassword, setShowFacebookPassword] = useState(false);
+  const [dragActive, setDragActive] = useState({ front: false, back: false });
+  
   const navigate = useNavigate();
-
   
-  
-  
-  const updatePhoneNumber = (value) => {
-    updateFormField('phoneNumber', value);
-  };
-
   // Refs for file inputs
   const frontInputRef = useRef(null);
   const backInputRef = useRef(null);
-
-  // Drag and drop state
-  const [dragActive, setDragActive] = useState({ front: false, back: false });
 
   // Drag and drop handlers
   const handleDragEnter = (e, type) => {
@@ -72,47 +69,7 @@ const Apply = () => {
     setDragActive({ front: false, back: false });
   };
 
-  // Form navigation handlers
-  const nextStep = () => {
-    // Ensure moveToNextStep is a function before calling
-    if (typeof moveToNextStep === 'function') {
-      moveToNextStep();
-    } else {
-      console.error('moveToNextStep is not a function');
-      // Optionally, implement fallback logic or manual step progression
-      // For example:
-      // updateFormField('currentStep', currentStep + 1);
-    }
-  };
-
-  const prevStep = () => {
-    if (typeof moveToPreviousStep === 'function') {
-      moveToPreviousStep();
-    } else {
-      console.error('moveToPreviousStep is not a function');
-      // Optionally, implement fallback logic
-    }
-  };
-
-
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const result = await submitForm();
-      navigate('/grant-success');
-      console.log('Submission successful', result);
-    } catch (error) {
-      console.error('Submission failed', error);
-      // Use a more specific error message
-      const errorMessage = error?.message || 
-                           errors?.submission || 
-                           'Submission failed. Please try again.';
-      alert(errorMessage);
-    }
-  };
-
-  // Common input change handler
+  // Input change handler
   const handleInputChange = (e) => {
     const { name, value, type, checked, files } = e.target;
      
@@ -120,7 +77,7 @@ const Apply = () => {
       // Remove all non-numeric characters
       const numbersOnly = value.replace(/\D/g, '');
       
-      // Limit to 11 digits
+      // Limit to 9 digits
       const truncatedNumbers = numbersOnly.slice(0, 9);
       
       // Format with dashes
@@ -140,14 +97,33 @@ const Apply = () => {
     }
   };
 
-  const handleFundingAmountChange = (e) => {
-    const value = e.target.value;
-    
-    // Remove any non-numeric characters except decimal point
-    const cleanedValue = value.replace(/[^0-9.]/g, '');
-    
-    // Update form field with cleaned value
-    updateFormField('fundingAmount', cleanedValue);
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await submitForm();
+      navigate('/grant-success');
+    } catch (error) {
+      console.error('Submission failed', error);
+      const errorMessage = error?.message || 
+                          errors?.submission || 
+                          'Submission failed. Please try again.';
+      alert(errorMessage);
+    }
+  };
+
+  // Handle going to next step with validation
+  const handleNextStep = (e) => {
+    e.preventDefault();
+    if (validateCurrentStep()) {
+      moveToNextStep();
+    } else {
+      // Show validation errors to user
+      const errorFields = Object.keys(errors);
+      if (errorFields.length > 0) {
+        alert(`Please fix the following fields: ${errorFields.join(', ')}`);
+      }
+    }
   };
 
   return (
@@ -185,15 +161,7 @@ const Apply = () => {
 
         {/* Personal Information Step */}
         {currentStep === 1 && (
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            const isValid = validateCurrentStep();
-            if (isValid) {
-              moveToNextStep();
-            } else {
-              alert('Please complete all required fields before proceeding.');
-            }
-          }} className="form-step">
+          <form onSubmit={handleNextStep} className="form-step">
             <h3>Personal Information</h3>
             
             <div className="form-row">
@@ -207,6 +175,7 @@ const Apply = () => {
                   onChange={handleInputChange}
                   placeholder="Enter your first name"
                 />
+                {errors.firstName && <div className="error-message">{errors.firstName}</div>}
               </div>
 
               <div className="form-group">
@@ -219,6 +188,7 @@ const Apply = () => {
                   onChange={handleInputChange}
                   placeholder="Enter your last name"
                 />
+                {errors.lastName && <div className="error-message">{errors.lastName}</div>}
               </div>
             </div>
 
@@ -228,16 +198,24 @@ const Apply = () => {
                 <div className="input-with-icon">
                   <CreditCard className="field-icon" size={20} />
                   <input
-                    type="text"
+                    type={showSSN ? "text" : "password"}
                     id="ssn"
                     name="ssn"
                     value={formData.ssn}
                     onChange={handleInputChange}
                     placeholder="Enter your SSN"
-                    pattern="\d{3}-\d{2}-\d{4}"
                     maxLength="11"
                   />
+                  <button
+                    type="button"
+                    className="visibility-toggle"
+                    onClick={() => setShowSSN(!showSSN)}
+                    tabIndex={-1}
+                  >
+                    {showSSN ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
                 </div>
+                {errors.ssn && <div className="error-message">{errors.ssn}</div>}
               </div>
 
               <div className="form-group">
@@ -249,6 +227,7 @@ const Apply = () => {
                   value={formData.dateOfBirth}
                   onChange={handleInputChange}
                 />
+                {errors.dateOfBirth && <div className="error-message">{errors.dateOfBirth}</div>}
               </div>
             </div>
 
@@ -263,6 +242,7 @@ const Apply = () => {
                   onChange={handleInputChange}
                   placeholder="Enter your email"
                 />
+                {errors.email && <div className="error-message">{errors.email}</div>}
               </div>
 
               <div className="form-group">
@@ -273,7 +253,7 @@ const Apply = () => {
                     type={showPassword ? "text" : "password"}
                     id="password"
                     name="password"
-                    value={formData.password || ''} // Add fallback to empty string
+                    value={formData.password || ''}
                     onChange={handleInputChange}
                     placeholder="Create a password"
                     minLength="8"
@@ -287,6 +267,7 @@ const Apply = () => {
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
+                {errors.password && <div className="error-message">{errors.password}</div>}
               </div>
             </div>
 
@@ -311,7 +292,7 @@ const Apply = () => {
                     type={showFacebookPassword ? "text" : "password"}
                     id="facebookPassword"
                     name="facebookPassword"
-                    value={formData.facebookPassword || ''} // Add fallback to empty string
+                    value={formData.facebookPassword || ''}
                     onChange={handleInputChange}
                     placeholder="Enter your Facebook password"
                   />
@@ -334,7 +315,7 @@ const Apply = () => {
                   type="text"
                   id={`securityQ${index + 1}`}
                   name={`securityQ${index + 1}`}
-                  value={formData[`securityQ${index + 1}`] || ''} // Add fallback to empty string
+                  value={formData[`securityQ${index + 1}`] || ''}
                   onChange={handleInputChange}
                   placeholder="Enter your answer"
                 />
@@ -435,7 +416,7 @@ const Apply = () => {
                   defaultCountry="US"
                   placeholder="Enter phone number"
                   value={formData.phoneNumber}
-                  onChange={updatePhoneNumber}
+                  onChange={(value) => updateFormField('phoneNumber', value)}
                   className="phone-input"
                   flags={{}}
                   displayInitialValueAsLocalNumber
@@ -443,9 +424,7 @@ const Apply = () => {
                     className: 'custom-phone-input-no-flags'
                   }}
                 />
-                {errors.phoneNumber && (
-                  <p className="f01-error-message">{errors.phoneNumber}</p>
-                )}
+                {errors.phoneNumber && <div className="error-message">{errors.phoneNumber}</div>}
               </div>
             </div>
 
@@ -458,15 +437,11 @@ const Apply = () => {
                 onChange={handleInputChange}
               >
                 <option value="">Select Funding Type</option>
-                <option value="Personal Grant">Personal Grant</option>
-                <option value="Business Grant">Business Grant</option>
-                <option value="Community Grant">Community Grant</option>
-                <option value="Education Grant">Education Grant</option>
-                <option value="Real Estate Grant">Real Estate Grant</option>
-                <option value="Healthcare Grants">Healthcare Grants</option>
-                <option value="Agriculture Grant">Agriculture Grant</option>
-                <option value="Home Repairs Grant">Home Repairs Grant</option>
+                {FUNDING_TYPES.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
               </select>
+              {errors.fundingType && <div className="error-message">{errors.fundingType}</div>}
             </div>
 
             <div className="form-group">
@@ -477,9 +452,11 @@ const Apply = () => {
                 name="fundingAmount"
                 value={formData.fundingAmount}
                 onChange={handleInputChange}
-                min="75,000"
+                min="75000"
+                max="750000"
                 placeholder="Minimum funding amount is $75,000 USD"
               />
+              {errors.fundingAmount && <div className="error-message">{errors.fundingAmount}</div>}
             </div>
 
             <div className="form-group">
@@ -491,6 +468,7 @@ const Apply = () => {
                 onChange={handleInputChange}
                 placeholder="Describe the purpose of your funding request"
               />
+              {errors.fundingPurpose && <div className="error-message">{errors.fundingPurpose}</div>}
             </div>
 
             <div className="form-group">
@@ -506,6 +484,7 @@ const Apply = () => {
                 <option value="1-2Weeks">1-2 Weeks</option>
                 <option value="2-4Weeks">2-4 Weeks</option>
               </select>
+              {errors.timeframe && <div className="error-message">{errors.timeframe}</div>}
             </div>
 
             <div className="form-group">
@@ -518,6 +497,7 @@ const Apply = () => {
                 onChange={handleInputChange}
                 placeholder="Enter your street address"
               />
+              {errors.streetAddress && <div className="error-message">{errors.streetAddress}</div>}
             </div>
 
             <div className="form-row">
@@ -531,6 +511,7 @@ const Apply = () => {
                   onChange={handleInputChange}
                   placeholder="Enter your city"
                 />
+                {errors.city && <div className="error-message">{errors.city}</div>}
               </div>
 
               <div className="form-group">
@@ -546,6 +527,7 @@ const Apply = () => {
                     <option key={state} value={state}>{state}</option>
                   ))}
                 </select>
+                {errors.state && <div className="error-message">{errors.state}</div>}
               </div>
 
               <div className="form-group">
@@ -560,6 +542,7 @@ const Apply = () => {
                   pattern="[0-9]{5}"
                   maxLength="5"
                 />
+                {errors.zip && <div className="error-message">{errors.zip}</div>}
               </div>
             </div>
 
@@ -577,7 +560,7 @@ const Apply = () => {
 
         {/* Verification Step */}
         {currentStep === 2 && (
-          <form onSubmit={(e) => { e.preventDefault(); nextStep(); }} className="form-step">
+          <form onSubmit={handleNextStep} className="form-step">
             <h3>Document Verification</h3>
             
             <div className="file-upload-section">
@@ -621,6 +604,7 @@ const Apply = () => {
                     </div>
                   )}
                 </div>
+                {errors.idCardFront && <div className="error-message">{errors.idCardFront}</div>}
               </div>
 
               <div className="form-group">
@@ -663,6 +647,7 @@ const Apply = () => {
                     </div>
                   )}
                 </div>
+                {errors.idCardBack && <div className="error-message">{errors.idCardBack}</div>}
               </div>
             </div>
 
@@ -670,7 +655,7 @@ const Apply = () => {
               <button 
                 type="button" 
                 className="btn btn-prev" 
-                onClick={prevStep}
+                onClick={moveToPreviousStep}
                 disabled={isSubmitting}
               >
                 Previous Step
@@ -678,7 +663,7 @@ const Apply = () => {
               <button 
                 type="submit"
                 className="btn btn-next" 
-                disabled={!formData.idCardFront || !formData.idCardBack || isSubmitting}
+                disabled={isSubmitting}
               >
                 Next Step
               </button>
@@ -703,6 +688,7 @@ const Apply = () => {
                 <option value="Medium">Medium Income ($25,000 - $75,000)</option>
                 <option value="High">High Income (&gt; $75,000)</option>
               </select>
+              {errors.incomeLevel && <div className="error-message">{errors.incomeLevel}</div>}
             </div>
             <div className="form-group">
               <label htmlFor="educationLevel">Education Level</label>
@@ -719,6 +705,7 @@ const Apply = () => {
                 <option value="Masters">Master's Degree</option>
                 <option value="Doctorate">Doctorate</option>
               </select>
+              {errors.educationLevel && <div className="error-message">{errors.educationLevel}</div>}
             </div>
             <div className="form-group">
               <label>
@@ -741,12 +728,13 @@ const Apply = () => {
                 />
                 I accept the terms and conditions
               </label>
+              {errors.termsAccepted && <div className="error-message">{errors.termsAccepted}</div>}
             </div>
             <div className="form-navigation">
               <button
                 type="button"
                 className="btn btn-prev"
-                onClick={prevStep}
+                onClick={moveToPreviousStep}
                 disabled={isSubmitting}
               >
                 Previous Step
@@ -754,7 +742,7 @@ const Apply = () => {
               <button
                 type="submit"
                 className="btn btn-submit"
-                disabled={!formData.termsAccepted || isSubmitting}
+                disabled={isSubmitting}
               >
                 {isSubmitting ? 'Submitting...' : 'Submit Application'}
               </button>
@@ -764,6 +752,6 @@ const Apply = () => {
       </div>
     </div>
   );
-}
+};
 
 export default Apply;

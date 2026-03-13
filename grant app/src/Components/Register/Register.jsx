@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { useRegisterGrant } from '../../Context/RegisterGrantContext';
+import { useRegister } from '../../Context/RegisterGrantContext';
 import './Register.css'
 
 const Register = () => {
+  // Fixed: Remove the destructuring of 'state' - get properties directly
   const {
-    state: { formData, errors: formErrors, loading, error, success },
+    formData, 
+    errors: formErrors, 
+    loading, 
+    error, 
+    success,
     updateForm,
     validateField,
     handleRegisterSubmit
-  } = useRegisterGrant();
+  } = useRegister();
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
