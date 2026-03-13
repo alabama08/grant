@@ -8,7 +8,7 @@ export default defineConfig({
     port: 3000, // You can specify a specific port or remove this line to use the default
     proxy: {
       '/api': {
-        target: 'https://grant-api.onrender.com',
+        target: 'https://grant-api-r6qv.onrender.com',
         changeOrigin: true,
         secure: false
       }

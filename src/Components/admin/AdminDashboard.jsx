@@ -4,7 +4,7 @@ import ApplicationList from './ApplicationList';
 // import ApplicationDetails from '../../Components/admin/';
 // import ReportGenerator from './ReportGenerator';
 
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = 'https://grant-api-r6qv.onrender.com';
 
 const AdminDashboard = () => {
   const [applications, setApplications] = useState([]);

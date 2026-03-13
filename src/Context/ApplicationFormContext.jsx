@@ -239,7 +239,7 @@ export const ApplicationFormProvider = ({ children }) => {
 
       const response = await axios({
         method: 'post',
-        url: 'https://grant-api.onrender.com/api/grants/submit',
+        url: 'https://grant-api-r6qv.onrender.com/api/grants/submit',
         data: submissionFormData,
         headers: { 
           'Content-Type': 'multipart/form-data',
